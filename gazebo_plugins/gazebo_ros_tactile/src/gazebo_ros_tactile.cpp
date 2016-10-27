@@ -45,7 +45,7 @@
 #include <urdf/sensor.h>
 //#include <ros/console.h>
 //#include <urdf_tactile/taxel_info_iterator.h>
-//#include <urdf_tactile/cast.h>
+#include <urdf_tactile/cast.h>
 
 
 
@@ -161,16 +161,43 @@ void GazeboRosTactile::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   
   this-> sensors = urdf::parseSensorsFromParam("robot_description", urdf::getSensorParser("tactile"));
   this-> numOfSensors=sensors.size();
-  this->tactile_state_msg_.sensors.resize(numOfSensors); //or place it at ##? //implement it in the initiliazation, less memory allocating operations
+   
   
-  //this-> numOfTaxels=12;//taxels_.size();
-  this->taxelPositions.resize(numOfSensors);//, std::vector<gazebo::math::Vector3>(numOfTaxels, gazebo::math::Vector3(0, 0, 0)));
-  this->taxelNormals.resize(numOfSensors);//, std::vector<gazebo::math::Vector3>(numOfTaxels, gazebo::math::Vector3(0, 0, 0)));
-  //unsigned int w=12;
-  this->numOfTaxels.resize(numOfSensors,12);
   
+  this->taxelPositions.clear();//resize(numOfSensors);//, std::vector<gazebo::math::Vector3>(numOfTaxels, gazebo::math::Vector3(0, 0, 0)));
+  this->taxelNormals.clear();//resize(numOfSensors);//, std::vector<gazebo::math::Vector3>(numOfTaxels, gazebo::math::Vector3(0, 0, 0)));
+  
+  //this->numOfTaxels.resize(numOfSensors,12);
+  
+  unsigned int i=0;
+  for (auto it = sensors.begin(), end = sensors.end(); it != end; ++it) {
+		urdf::tactile::TactileSensorConstSharedPtr sensor = urdf::tactile::tactile_sensor_cast(it->second);
+		if (!sensor) continue;  // some other sensor than tactile
+		
+		
+		
+		this->numOfTaxels.push_back(sensor -> taxels_.size());
+		this->taxelNormals.push_back(std::vector<gazebo::math::Vector3>(numOfTaxels[i], gazebo::math::Vector3(0, 0, 0)));//[i].resize(numOfTaxels[i]);
+		this->taxelPositions.push_back(std::vector<gazebo::math::Vector3>(numOfTaxels[i], gazebo::math::Vector3(0, 0, 0)));//[i].resize(numOfTaxels[i]);
+		for(unsigned int j=0; j < numOfTaxels[i]; j++){
+			this->taxelPositions[i][j]=
+				gazebo::math::Vector3(	sensor->taxels_[j] -> origin.position.x,
+										sensor->taxels_[j] -> origin.position.y,
+										sensor->taxels_[j] -> origin.position.z);
+										
+			this->taxelNormals[i][j]=gazebo::math::Vector3(0, i, j);
+			//normal=rotation times zAxis?
+		}
+		i++;
+		//else mitzählen, wahre Sensornumber
+
+	}
+  this-> numOfSensors=i;
+  this->tactile_state_msg_.sensors.resize(numOfSensors);
+  /*
   for(unsigned int i=0; i < numOfSensors; i++){
-	  this->numOfTaxels[i]=12;
+	  //this->numOfTaxels[i]=12;//sensors[i].array_ -> rows;
+	  ROS_INFO_STREAM_ONCE("numOfTaxels" << i << " :" <<numOfTaxels[i]);
 	  this->tactile_state_msg_.sensors[i].values.resize(numOfTaxels[i]);
 	  this->taxelPositions[i].resize(numOfTaxels[i]);
 	  this->taxelNormals[i].resize(numOfTaxels[i]);
@@ -181,7 +208,8 @@ void GazeboRosTactile::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 		  
 	  }
 	  
-  }
+  }*/
+  
   
   
   //taxels_.push_back(Taxel(taxel->position, taxel->normal));
@@ -280,6 +308,8 @@ void GazeboRosTactile::OnContact()
   math::Pose pose, frame_pose;
   math::Quaternion rot, frame_rot;
   math::Vector3 pos, frame_pos;
+  
+  float forceSensivity=0.1f;
 
   // Get frame orientation if frame_id is given */
   if (local_link_)
@@ -315,7 +345,7 @@ for (unsigned int m=0; m < this->numOfSensors; m++){	//Loop over Sensors
 	 
 	 
 	 
-	 double finalProjectedForce=0.0; //same
+	 float finalProjectedForce=0.0f; //not necessary here
 	  
 	  
 	  
@@ -432,7 +462,7 @@ for (unsigned int m=0; m < this->numOfSensors; m++){	//Loop over Sensors
 		  distance=sqrt(pow((position.x-taxelPositions[m][k].x),2)+pow((position.y-taxelPositions[m][k].y),2)+pow((position.z-taxelPositions[m][k].z),2));
 
 		  if(distance>critDist){
-			finalProjectedForce+=0.0; // bzw continue;
+			finalProjectedForce+=0.0f; // bzw continue;
 			//nächster Durchlauf
 		  }
 		  else{
@@ -460,8 +490,12 @@ for (unsigned int m=0; m < this->numOfSensors; m++){	//Loop over Sensors
 		  //this->contact_state_msg_.states.push_back(state);
 		  
 	  }// END FOR contactsPacketSize (What does this mean?)
-	  
 	  //is the force to small first contact thershold
+	  if(finalProjectedForce < forceSensivity){
+		  finalProjectedForce=0.0f;
+	  }
+	  
+	  
 	  this->tactile_state_msg_.sensors[m].values[k]=finalProjectedForce;//tSensor.values.push_back(finalProjectedForce); //if changed above, access, not pubsh_back
   }//END FOR Taxels
   this->tactile_pub_.publish(this->tactile_state_msg_);
