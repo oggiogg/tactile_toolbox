@@ -277,7 +277,7 @@ void GazeboRosTactile::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
     return;
   }
   else if (numOfSensors > 1){
-    ROS_WARN_STREAM("Multible matching for " << gzSensorName 
+    ROS_WARN_STREAM("Multiple matching for " << gzSensorName 
                     << " count: " << numOfSensors 
                     << "\n all matchings will be published");
   }
