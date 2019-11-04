@@ -107,6 +107,7 @@ public Q_SLOTS:
   virtual void onVisibleChanged();
   void setVisible(bool visible);
   void setEnabled(bool enabled);
+  void setDisableRangeUpdate(bool val);
 
 protected:
   float mapValue(const::tactile::TactileValue &value);
@@ -115,6 +116,7 @@ protected:
 
 protected Q_SLOTS:
   void setRawRangeFromProperty();
+  void setDisableRangeUpdateFromProperty();
 
 protected:
   rviz::Display *owner_;
@@ -136,9 +138,11 @@ protected:
 
   ::tactile::Range raw_range_;
   RangeProperty *range_property_;
+  BoolProperty *disable_range_update_property_;
   rviz::FloatProperty *acc_value_property_;
 
   bool enabled_;
+  bool range_update_disabled_;
 };
 
 }
