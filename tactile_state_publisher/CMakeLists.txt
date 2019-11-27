@@ -13,6 +13,9 @@ catkin_package(
 #  DEPENDS
 )
 
+catkin_python_setup()
+
+
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(${PROJECT_NAME} src/tactile_state_publisher.cpp)
