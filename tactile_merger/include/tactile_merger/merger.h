@@ -41,8 +41,8 @@ public:
 
 	template <typename Iterator>
 	void update(const ros::Time &stamp, const std::string &channel,
-	            Iterator begin, Iterator end);
-	tactile_msgs::TactileContacts getContacts();
+	            Iterator begin, Iterator end, bool use_lock = true);
+	tactile_msgs::TactileContacts getContacts(bool use_lock = true);
 
 private:
 	struct GroupData;

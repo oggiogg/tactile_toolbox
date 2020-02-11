@@ -74,7 +74,7 @@ void Merger::init(const std::string &param)
 
 template <typename Iterator>
 void Merger::update(const ros::Time &stamp, const std::string &channel,
-                    Iterator begin, Iterator end) {
+                    Iterator begin, Iterator end, bool use_lock /*= true*/) {
 	auto range = sensors_.equal_range(channel);
 	if (range.first == range.second) {
 		ROS_ERROR_STREAM_ONCE("unknown channel: " << channel);
@@ -86,36 +86,57 @@ void Merger::update(const ros::Time &stamp, const std::string &channel,
 		TaxelGroupPtr &group = data->group;
 		const TaxelGroup::TaxelMapping &mapping = *ch->second.second;
 		{
-			boost::unique_lock<boost::mutex> lock(data->mutex);
-			data->timestamp = stamp;
-			group->update(mapping, begin, end);
+		    if (use_lock){
+                boost::unique_lock<boost::mutex> lock(data->mutex);
+                data->timestamp = stamp;
+                group->update(mapping, begin, end);
+		    } else {
+                data->timestamp = stamp;
+                group->update(mapping, begin, end);
+		    }
 		}
 	}
 }
 template void Merger::update<std::vector<float>::const_iterator>
 (const ros::Time &stamp, const std::string &sensor_name,
-std::vector<float>::const_iterator begin, std::vector<float>::const_iterator end);
+std::vector<float>::const_iterator begin, std::vector<float>::const_iterator end, bool use_lock /*= true*/);
 
-tactile_msgs::TactileContacts Merger::getContacts() {
+tactile_msgs::TactileContacts Merger::getContacts(bool use_lock /*= true*/) {
 	static ros::Duration timeout(1);
 	ros::Time now = ros::Time::now();
 
 	tactile_msgs::TactileContacts contacts;
 	for (auto it = groups_.begin(), end = groups_.end(); it != end; ++it) {
 		const GroupDataPtr &data = it->second;
-		boost::unique_lock<boost::mutex> lock(data->mutex);
-		if (data->timestamp + timeout < now)
-			continue; // ignore stalled groups
+        if (use_lock){
+            boost::unique_lock<boost::mutex> lock(data->mutex);
+            if (data->timestamp + timeout < now)
+                continue; // ignore stalled groups
 
-		tactile_msgs::TactileContact contact;
-		contact.name = it->first; // group name
-		contact.header.frame_id = data->group->frame();
-		contact.header.stamp = data->timestamp;
-		if (!data->group->average(contact))
-			continue; // ignore not contacted groups
+            tactile_msgs::TactileContact contact;
+            contact.name = it->first; // group name
+            contact.header.frame_id = data->group->frame();
+            contact.header.stamp = data->timestamp;
+            if (!data->group->average(contact))
+                continue; // ignore not contacted groups
 
-		// insert all contacts of the group into result array
-		contacts.contacts.push_back(contact);
+            // insert all contacts of the group into result array
+            contacts.contacts.push_back(contact);
+        } else {
+            if (data->timestamp + timeout < now)
+                continue; // ignore stalled groups
+
+            tactile_msgs::TactileContact contact;
+            contact.name = it->first; // group name
+            contact.header.frame_id = data->group->frame();
+            contact.header.stamp = data->timestamp;
+            if (!data->group->average(contact))
+                continue; // ignore not contacted groups
+
+            // insert all contacts of the group into result array
+            contacts.contacts.push_back(contact);
+        }
+
 	}
 	return contacts;
 }
